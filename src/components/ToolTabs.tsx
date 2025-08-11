@@ -16,6 +16,8 @@ import { UploadZone } from "./UploadZone";
 import { FileList } from "./FileList";
 import { ProcessingView } from "./ProcessingView";
 import { useState } from "react";
+import { useDocuments } from "@/hooks/useDocuments";
+import { useToast } from "@/hooks/use-toast";
 
 interface FileItem {
   id: string;
@@ -29,6 +31,8 @@ interface FileItem {
 export function ToolTabs() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [activeTab, setActiveTab] = useState("convert");
+  const { createDocument, createProcessingJob, updateJobProgress, completeJob } = useDocuments();
+  const { toast } = useToast();
 
   const handleFilesSelected = (newFiles: File[]) => {
     const fileItems: FileItem[] = newFiles.map(file => ({
@@ -51,36 +55,72 @@ export function ToolTabs() {
     ));
   };
 
-  const startProcessing = () => {
+  const startProcessing = async () => {
     setFiles(prev => prev.map(f => 
       f.status === 'pending' ? { ...f, status: 'processing' as const, progress: 0 } : f
     ));
     
-    // Simulate processing
-    files.forEach((file, index) => {
+    // Process each file
+    for (const [index, file] of files.entries()) {
       if (file.status === 'pending') {
-        setTimeout(() => {
-          const interval = setInterval(() => {
-            setFiles(prev => prev.map(f => {
-              if (f.id === file.id && f.status === 'processing') {
-                const newProgress = Math.min((f.progress || 0) + 10, 100);
-                if (newProgress === 100) {
-                  clearInterval(interval);
-                  return { 
-                    ...f, 
-                    status: 'completed' as const, 
-                    progress: 100,
-                    outputUrl: `#download-${f.id}`
-                  };
+        try {
+          // Create document record
+          const documentId = await createDocument(file.file);
+          if (!documentId) continue;
+
+          // Create processing job
+          const jobId = await createProcessingJob(documentId, activeTab, { 
+            convertTo: file.convertTo 
+          });
+          if (!jobId) continue;
+
+          // Simulate processing with database updates
+          setTimeout(() => {
+            const interval = setInterval(async () => {
+              setFiles(prev => prev.map(f => {
+                if (f.id === file.id && f.status === 'processing') {
+                  const newProgress = Math.min((f.progress || 0) + 10, 100);
+                  
+                  // Update progress in database
+                  updateJobProgress(jobId, newProgress, newProgress === 100 ? 'completed' : 'processing');
+                  
+                  if (newProgress === 100) {
+                    clearInterval(interval);
+                    // Complete job with output path
+                    completeJob(jobId, `processed-${file.file.name}`);
+                    
+                    toast({
+                      title: "Processing complete!",
+                      description: `${file.file.name} has been processed successfully.`,
+                    });
+                    
+                    return { 
+                      ...f, 
+                      status: 'completed' as const, 
+                      progress: 100,
+                      outputUrl: `#download-${f.id}`
+                    };
+                  }
+                  return { ...f, progress: newProgress };
                 }
-                return { ...f, progress: newProgress };
-              }
-              return f;
-            }));
-          }, 200);
-        }, index * 500);
+                return f;
+              }));
+            }, 200);
+          }, index * 500);
+        } catch (error) {
+          console.error('Error processing file:', error);
+          setFiles(prev => prev.map(f => 
+            f.id === file.id ? { ...f, status: 'error' as const } : f
+          ));
+          
+          toast({
+            title: "Processing failed",
+            description: `Failed to process ${file.file.name}`,
+            variant: "destructive",
+          });
+        }
       }
-    });
+    }
   };
 
   const tools = [

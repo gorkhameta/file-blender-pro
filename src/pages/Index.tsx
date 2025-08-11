@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Navbar } from "@/components/Navbar";
 import { ToolTabs } from "@/components/ToolTabs";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,31 @@ import {
 } from "lucide-react";
 
 const Index = () => {
+  const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      window.location.href = '/auth';
+    }
+  }, [user, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center mx-auto animate-pulse">
+            <div className="w-6 h-6 bg-white rounded"></div>
+          </div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

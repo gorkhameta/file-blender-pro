@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, FileText } from "lucide-react";
+import { Moon, Sun, FileText, LogOut, User } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { Link } from "react-router-dom";
 
 export function Navbar() {
   const [isDark, setIsDark] = useState(false);
+  const { user, signOut } = useAuth();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -58,9 +61,24 @@ export function Navbar() {
             )}
           </Button>
           
-          <Button variant="default" size="sm">
-            Sign In
-          </Button>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline">{user.email}</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={signOut} className="gap-2">
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
+            </div>
+          ) : (
+            <Link to="/auth">
+              <Button variant="default" size="sm">
+                Sign In
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>
